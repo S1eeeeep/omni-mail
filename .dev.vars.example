@@ -1,0 +1,25 @@
+# Required by the Deploy to Cloudflare setup flow.
+SETUP_TOKEN=
+SUPER_ADMIN_EMAIL=
+
+# 可选：所有外部邮箱共用一个至少 32 个随机 UTF-8 字节的 Secret。
+MAIL_CREDENTIALS_KEY=
+
+# 可选：Telegram 新邮件提醒。正式部署请配置为 Cloudflare Worker Secret。
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_WEBHOOK_SECRET=
+
+# 独立密钥仍受支持；升级时不要删除已有值。主管理员可从首页主动迁移历史凭据。
+# ICLOUD_CREDENTIALS_KEY=
+# LINUX_DO_MAIL_CREDENTIALS_KEY=
+# GMAIL_CREDENTIALS_KEY=
+# QQ_MAIL_CREDENTIALS_KEY=
+# NAVER_MAIL_CREDENTIALS_KEY=
+# MICROSOFT_CREDENTIALS_KEY=
+# YANDEX_MAIL_CREDENTIALS_KEY=
+
+QQ_MAIL_IMAP_ENABLED=true
+MICROSOFT_MAIL_ENABLED=true
+# 按原有策略保留显式启用开关。
+NAVER_MAIL_IMAP_ENABLED=false
+YANDEX_MAIL_IMAP_ENABLED=false

@@ -1,0 +1,117 @@
+.connected-addresses-card {
+  display: grid;
+  gap: 11px;
+}
+
+.connected-addresses-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.connected-addresses-heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.connected-addresses-heading strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.connected-addresses-heading span {
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.connected-address-list {
+  display: grid;
+  gap: 7px;
+}
+
+.connected-address-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: var(--surface-muted);
+}
+
+.connected-address-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.connected-address-copy > span {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.connected-address-copy strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connected-address-copy small {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connected-address-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.connected-address-actions button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.connected-address-actions button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.connected-address-unavailable {
+  max-width: 110px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+@media (max-width: 380px) {
+  .connected-address-row {
+    grid-template-columns: 1fr;
+  }
+
+  .connected-address-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

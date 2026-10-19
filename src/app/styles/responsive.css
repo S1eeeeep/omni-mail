@@ -1,0 +1,550 @@
+@media (max-width: 1120px) {
+  .mail-layout {
+    grid-template-columns: 78px minmax(310px, 350px) minmax(0, 1fr);
+  }
+
+  .mail-sidebar {
+    --sidebar-padding-inline: 10px;
+    align-items: center;
+    padding-inline: 10px;
+  }
+
+  .sidebar-brand {
+    padding-inline: 0;
+  }
+
+  .sidebar-brand .brand > span:last-child,
+  .folder-nav button span,
+  .folder-nav button small,
+  .admin-nav button span,
+  .account-nav button span,
+  .sidebar-account > div,
+  .sidebar-brand-links,
+  .account-avatar {
+    display: none;
+  }
+
+  .folder-nav {
+    width: 100%;
+  }
+
+  .folder-nav button,
+  .admin-nav button,
+  .account-nav button {
+    display: grid;
+    width: 48px;
+    height: 46px;
+    min-height: 46px;
+    grid-template-columns: 1fr;
+    margin-inline: auto;
+    place-items: center;
+    padding: 0;
+  }
+
+  .admin-nav {
+    width: 100%;
+    padding-top: 14px;
+  }
+
+  .account-nav {
+    width: 100%;
+  }
+
+  .sidebar-account {
+    display: block;
+    padding-inline: 0;
+  }
+
+  .sidebar-theme {
+    width: 78px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    margin-inline: -10px;
+    padding: 0 0 18px;
+  }
+
+  .sidebar-theme .language-quick-toggle {
+    width: 46px;
+    height: 32px;
+  }
+
+  .sidebar-theme .sidebar-notification-toggle {
+    width: 46px;
+    height: 32px;
+  }
+
+  .sidebar-theme .theme-selector {
+    grid-auto-flow: column;
+    gap: 0;
+    padding: 2px;
+  }
+
+  .sidebar-theme .theme-selector button {
+    width: 24px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  .sidebar-theme .theme-selector svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .reader-content {
+    padding-inline: 28px;
+  }
+}
+
+@media (max-width: 760px) {
+  .mail-layout {
+    display: block;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .mobile-sidebar-toggle {
+    position: fixed;
+    z-index: 70;
+    top: max(14px, env(safe-area-inset-top));
+    left: 14px;
+    display: grid;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: 0 8px 24px color-mix(in srgb, #000 10%, transparent);
+    touch-action: manipulation;
+    transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .mobile-sidebar-toggle:hover {
+    background: var(--surface-hover);
+  }
+
+  .mobile-sidebar-toggle:active {
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+
+  .mobile-sidebar-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .mobile-sidebar-toggle[aria-expanded="true"] {
+    visibility: hidden;
+  }
+
+  .mail-layout.has-selection .mobile-sidebar-toggle,
+  .mail-layout:has(.icloud-mail-view.has-selection) .mobile-sidebar-toggle {
+    display: none;
+  }
+
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    z-index: 80;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: color-mix(in srgb, #000 52%, transparent);
+    cursor: default;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 180ms ease-in, visibility 0s linear 220ms;
+  }
+
+  .mobile-sidebar-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+    transition: opacity 220ms ease-out, visibility 0s;
+  }
+
+  .mail-sidebar {
+    position: fixed;
+    z-index: 90;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    width: min(86vw, 336px);
+    height: 100vh;
+    height: 100dvh;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overflow: hidden;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface-muted) 97%, transparent);
+    box-shadow: 18px 0 48px color-mix(in srgb, #000 22%, transparent);
+    opacity: 0.96;
+    pointer-events: none;
+    touch-action: manipulation;
+    transform: translateX(calc(-100% - 20px));
+    visibility: hidden;
+    transition: transform 220ms ease-in, opacity 180ms ease-in,
+      visibility 0s linear 240ms;
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+  }
+
+  .mail-sidebar.is-mobile-open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    visibility: visible;
+    transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 220ms ease-out, visibility 0s;
+  }
+
+  .sidebar-brand {
+    display: flex;
+    padding: 0 0 14px;
+  }
+
+  .sidebar-brand-links {
+    display: flex;
+  }
+
+  .sidebar-brand .brand > span:last-child {
+    display: inline;
+  }
+
+  .folder-nav button span,
+  .folder-nav button small,
+  .admin-nav button span,
+  .account-nav button span {
+    display: block;
+  }
+
+  .mail-sidebar .sidebar-account > div,
+  .mail-sidebar .account-avatar {
+    display: grid;
+  }
+
+  .mobile-sidebar-close {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    margin-left: 2px;
+  }
+
+  .folder-nav {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .folder-nav button,
+  .admin-nav button,
+  .account-nav button {
+    display: grid;
+    width: 100%;
+    height: auto;
+    min-height: 48px;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    justify-items: start;
+    padding: 0 12px;
+    border-radius: 12px;
+    text-align: left;
+  }
+
+  .folder-nav button small {
+    justify-self: end;
+  }
+
+  .admin-nav {
+    position: static;
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    margin-top: 18px;
+    padding: 18px 0 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    visibility: visible;
+    transition: none;
+  }
+
+  .account-nav {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+
+  .account-nav-secondary {
+    display: contents;
+  }
+
+  .sidebar-navigation {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    margin-inline: -4px;
+    padding: 0 4px 10px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .account-nav button.is-active-mobile {
+    background: transparent;
+    color: var(--text-secondary);
+  }
+
+  .mail-sidebar .sidebar-account {
+    display: grid;
+  }
+
+  .mail-sidebar .sidebar-theme {
+    display: flex;
+    width: auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 4px;
+    margin-inline: 0;
+    padding: 0 10px 14px;
+  }
+
+  .mail-sidebar .sidebar-theme .language-quick-toggle,
+  .mail-sidebar .sidebar-theme .sidebar-notification-toggle {
+    width: 38px;
+    height: 38px;
+  }
+
+  .mail-sidebar .sidebar-theme .theme-selector {
+    grid-auto-flow: column;
+    gap: 1px;
+    padding: 3px;
+  }
+
+  .mail-sidebar .sidebar-theme .theme-selector button {
+    width: 28px;
+    height: 32px;
+  }
+
+  .sidebar-account {
+    margin: 0;
+    padding: 10px 10px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .list-pane {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    border: 0;
+  }
+
+  .list-header {
+    min-height: 102px;
+  }
+
+  .mailbox-list-header {
+    min-height: 128px;
+    padding-top: max(20px, env(safe-area-inset-top));
+  }
+
+  .mailbox-list-header .list-header__scope-row {
+    padding-left: 54px;
+  }
+
+  .icloud-list-header > div:first-child > :first-child {
+    margin-left: 54px;
+  }
+
+  .message-row__main {
+    min-height: 100px;
+    padding-left: 44px;
+  }
+
+  .reader-pane {
+    position: fixed;
+    z-index: 40;
+    inset: 0;
+    display: none;
+    background: var(--surface);
+  }
+
+  .mail-layout.has-selection .reader-pane {
+    display: block;
+    animation: mobile-reader-in 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @keyframes mobile-reader-in {
+    from { opacity: 0.3; transform: translateX(18px); }
+  }
+
+  .mobile-back {
+    display: inline-grid;
+  }
+
+  .reader-toolbar {
+    min-height: 60px;
+    padding: max(8px, env(safe-area-inset-top)) 14px 8px;
+  }
+
+  .reader-content {
+    padding: 22px 14px 36px;
+    overflow-x: hidden;
+  }
+
+  .message-heading h1 {
+    margin-bottom: 21px;
+    font-size: clamp(24px, 7.5vw, 29px);
+  }
+
+  .sender-block {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .sender-block time {
+    grid-column: 2;
+    margin: 2px 0 0;
+  }
+
+  .plain-body {
+    padding: 21px 18px;
+  }
+
+  .plain-body,
+  .email-frame {
+    max-width: 100%;
+  }
+
+  .reply-composer {
+    position: fixed;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: calc(100% - 20px);
+  }
+
+  .toast {
+    right: 50%;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    transform: translateX(50%);
+    white-space: nowrap;
+  }
+
+  .toast--update {
+    bottom: max(68px, calc(env(safe-area-inset-bottom) + 54px));
+  }
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translate(50%, 8px); }
+  }
+}
+
+@media (max-width: 360px) {
+  .list-header:not(.mailbox-list-header) {
+    min-height: 154px;
+    flex-wrap: wrap;
+    align-content: flex-end;
+    gap: 10px;
+  }
+
+  .list-header:not(.mailbox-list-header) > div:first-child,
+  .list-header:not(.mailbox-list-header) > .list-header__actions {
+    width: 100%;
+  }
+
+  .list-header:not(.mailbox-list-header) > .list-header__actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 520px) {
+  .auth-page {
+    padding: 17px 16px 44px;
+  }
+
+  .auth-card {
+    margin-top: 39px;
+    padding: 31px 22px;
+    border-radius: var(--radius-lg);
+  }
+
+  .auth-card h1 {
+    font-size: 29px;
+  }
+
+  .auth-symbol {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  .list-header {
+    padding-inline: 17px;
+  }
+
+  .search-field,
+  .list-error {
+    margin-inline: 12px;
+  }
+
+  .reader-toolbar .toolbar-button {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .message-footer-actions {
+    align-items: flex-start;
+    flex-direction: column-reverse;
+  }
+
+  .message-footer-actions .button {
+    width: 100%;
+  }
+
+  .attachment-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reply-composer textarea {
+    min-height: 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,79 @@
+.message-list-item,
+.recent-mail-item {
+  border-bottom: 1px solid var(--line);
+}
+
+.message-list-item:last-child,
+.recent-mail-item:last-child {
+  border-bottom: 0;
+}
+
+.message-open-button,
+.recent-mail-open-button {
+  border-bottom: 0 !important;
+}
+
+.verification-code-bar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 13px 10px 30px;
+}
+
+.verification-code-bar > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.verification-code-bar small {
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.verification-code-bar strong {
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.verification-code-bar > div {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.verification-code-bar button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.verification-code-bar button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.recent-mail-item .verification-code-bar {
+  padding-left: 27px;
+}
+
+@media (max-width: 380px) {
+  .verification-code-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
