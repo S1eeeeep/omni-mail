@@ -68,6 +68,108 @@ describe('durable mail push', () => {
     expect(status.routes[0].enqueued_at).toBeGreaterThan(0)
   })
 
+  it('requeues mail arriving while an otherwise empty delivery holds the lease', async () => {
+    await configureMailPush(env, user, configuration())
+    await env.DB.prepare('UPDATE mail_push_routes SET initialized=1').run()
+    const e = environment()
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      await message('arrived-during-heartbeat', true)
+      await (await pushSnapshot(env, 'arrived-during-heartbeat', 'ready', 'Verification code 000123')).run()
+      await enqueueMailPush(e)
+      expect(e.MAIL_PUSH_QUEUE!.send).not.toHaveBeenCalled()
+      return Response.json({ status: 'accepted' })
+    }))
+    const result = await runDelivery(e)
+    expect(result.ack).toHaveBeenCalledOnce()
+    expect(e.MAIL_PUSH_QUEUE!.send).toHaveBeenCalledOnce()
+    expect(await env.DB.prepare("SELECT count(*) AS n FROM mail_push_outbox WHERE status='pending'").first()).toEqual({ n: 1 })
+  })
+
+  it('does not hot-loop or deliver a queued mailbox after its ownership changes', async () => {
+    await configureMailPush(env, user, configuration())
+    await env.DB.prepare('UPDATE mail_push_routes SET initialized=1').run()
+    await message('owned-when-received', true)
+    await (await pushSnapshot(env, 'owned-when-received', 'ready', 'Verification code 000123')).run()
+    await env.DB.prepare("INSERT OR IGNORE INTO users(id,email,display_name,password_hash) VALUES('push-other-owner','push-other@example.com','Other','fixture')").run()
+    await env.DB.prepare("UPDATE mailboxes SET user_id='push-other-owner' WHERE address=?").bind(mailbox).run()
+    const e = environment(), fetcher = vi.fn(async () => Response.json({ status: 'accepted' }))
+    vi.stubGlobal('fetch', fetcher)
+    try {
+      const result = await runDelivery(e)
+      await enqueueMailPush(e)
+      expect(result.ack).toHaveBeenCalledOnce()
+      expect(fetcher).not.toHaveBeenCalled()
+      expect(e.MAIL_PUSH_QUEUE!.send).not.toHaveBeenCalled()
+      expect(await env.DB.prepare("SELECT count(*) AS n FROM mail_push_outbox WHERE status='pending'").first()).toEqual({ n: 1 })
+    } finally { await env.DB.prepare('UPDATE mailboxes SET user_id=? WHERE address=?').bind(user.id, mailbox).run() }
+  })
+
+  it('refreshes progress when a receipt commits between the route and outbox reads', async () => {
+    await configureMailPush(env, user, configuration())
+    await env.DB.prepare('UPDATE mail_push_routes SET initialized=1').run()
+    await message('first-receipt', true)
+    await (await pushSnapshot(env, 'first-receipt', 'ready', 'Verification code 000111')).run()
+    let injected = false
+    const wrap = (statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, {
+      get(target, property) {
+        if (property === 'bind') return (...values: unknown[]) => wrap(target.bind(...values))
+        if (property === 'all') return async () => {
+          if (!injected) {
+            injected = true
+            await message('racing-receipt', true)
+            await (await pushSnapshot(env, 'racing-receipt', 'ready', 'Verification code 000222')).run()
+          }
+          return target.all()
+        }
+        const value = Reflect.get(target, property)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+    const e = environment()
+    e.DB = new Proxy(env.DB, { get(target, property) {
+      if (property === 'prepare') return (sql: string) => sql.includes('SELECT event_id,sequence,payload_json') ? wrap(target.prepare(sql)) : target.prepare(sql)
+      const value = Reflect.get(target, property)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      const batch = JSON.parse(String(init.body))
+      expect(batch.streams[0].high_water).toBe(2)
+      expect(batch.events.map((event: { sequence: number }) => event.sequence)).toEqual([1, 2])
+      return Response.json({ status: 'accepted' })
+    }))
+    await runDelivery(e)
+    expect(injected).toBe(true)
+    expect(await env.DB.prepare("SELECT count(*) AS n FROM mail_push_outbox WHERE status='pending'").first()).toEqual({ n: 0 })
+  })
+
+  it('keeps oversized bodies separate and every HTTP batch within the byte budget', async () => {
+    await configureMailPush(env, user, configuration())
+    await env.DB.prepare('UPDATE mail_push_routes SET initialized=1').run()
+    const text = 'Verification code 001234 ' + 'x'.repeat(400 * 1024)
+    for (let index = 0; index < 8; index++) {
+      await message(`large-${index}`, true)
+      await (await pushSnapshot(env, `large-${index}`, 'ready', text)).run()
+    }
+    const complete = new Set<string>()
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(new TextEncoder().encode(String(init.body)).byteLength).toBeLessThanOrEqual(3 * 1024 * 1024)
+      const batch = JSON.parse(String(init.body))
+      for (const event of batch.events) {
+        if (event.metadata_only) expect(event.text).toBe('')
+        else { expect(event.text).toBe(text); complete.add(event.id) }
+      }
+      return Response.json({ status: 'accepted' })
+    })
+    vi.stubGlobal('fetch', fetcher)
+    const e = environment()
+    await runDelivery(e)
+    expect(complete.size).toBe(0)
+    await runDelivery(e); await runDelivery(e)
+    expect(complete.size).toBe(8)
+    expect(fetcher).toHaveBeenCalledTimes(3)
+    expect(await env.DB.prepare("SELECT count(*) AS n FROM mail_push_outbox WHERE status='pending'").first()).toEqual({ n: 0 })
+  }, 30_000)
+
   it('constructs delivery requests with actual workerd-supported fetch options', async () => {
     await configureMailPush(env, user, configuration())
     await env.DB.prepare('UPDATE mail_push_routes SET initialized=1').run()
@@ -97,7 +199,7 @@ describe('durable mail push', () => {
     expect(await env.DB.prepare('SELECT status,last_error_code FROM mail_push_outbox').first()).toEqual({ status: 'pending', last_error_code: 'MAIL_PUSH_HTTP_302' })
   })
 
-  it('atomically records real receipt and parsed body, then signs metadata and independent body deliveries', async () => {
+  it('atomically records receipt and parsed body, then signs one inline delivery for an ordinary OTP', async () => {
     await configureMailPush(env, user, configuration())
     const e = environment()
     // Isolate the delivery test from backfill; realtime writes remain enabled.
@@ -120,15 +222,48 @@ describe('durable mail push', () => {
       return Response.json({ status: 'accepted' })
     }))
     await runDelivery(e)
-    const first = deliveries[0] as { events: { state: string; metadata_only?: boolean; text: string }[] }
-    expect(first.events.find((v) => v.state === 'ready')).toMatchObject({ metadata_only: true, text: '' })
-    expect(await env.DB.prepare("SELECT count(*) AS n FROM mail_push_outbox WHERE status='pending'").first()).toEqual({ n: 1 })
-    await runDelivery(e)
-    const next = deliveries[1] as { events: { text: string; text_hash: string; received_at: number; headers: unknown }[] }
-    expect(next.events[0].text).toContain('002468')
-    expect(next.events[0].text_hash).toBe(await digest(next.events[0].text))
-    expect(JSON.stringify(next.events[0].headers)).toContain('x-icloud-hme')
+    const first = deliveries[0] as { events: { state: string; metadata_only?: boolean; text: string; text_hash: string; headers: unknown }[] }
+    const ready = first.events.find((v) => v.state === 'ready')!
+    expect(ready.metadata_only).not.toBe(true)
+    expect(ready.text).toContain('002468')
+    expect(ready.text_hash).toBe(await digest(ready.text))
+    expect(JSON.stringify(ready.headers)).toContain('x-icloud-hme')
+    expect(deliveries).toHaveLength(1)
+    expect(e.MAIL_PUSH_QUEUE!.send).not.toHaveBeenCalled()
     expect(await env.DB.prepare("SELECT count(*) AS n FROM mail_push_outbox WHERE status='sent'").first()).toEqual({ n: 2 })
+  })
+
+  it.each([false, true])('dispatches parsing while backup is pending, retaining both outcomes (queue failure: %s)', async (queueFails) => {
+    await env.DB.prepare("INSERT OR IGNORE INTO domains(name,is_active) VALUES('example.com',1)").run()
+    const previous = await env.DB.prepare("SELECT value FROM settings WHERE key='backup_enabled'").first<{ value: string }>()
+    await env.DB.prepare("INSERT INTO settings(key,value,updated_at) VALUES('backup_enabled','1',unixepoch()) ON CONFLICT(key) DO UPDATE SET value='1'").run()
+    let release!: () => void, entered!: () => void
+    const backupGate = new Promise<void>((resolve) => { release = resolve })
+    const backupStarted = new Promise<void>((resolve) => { entered = resolve })
+    const queue = { send: vi.fn(async () => { if (queueFails) throw new Error('fixture queue unavailable') }) }
+    const e = { ...environment(), MAIL_QUEUE: queue, BACKUP_BUCKET: {
+      head: async () => null, put: async () => { entered(); await backupGate },
+    } } as unknown as Env
+    const raw = 'From: sender@example.net\r\nTo: push-owner@example.com\r\nSubject: Verification\r\n\r\nFixture'
+    const input = { to: mailbox, from: 'sender@example.net', raw: new Response(raw).body,
+      rawSize: raw.length, headers: new Headers({ To: mailbox }), setReject: vi.fn() }
+    let finished = false, receiveError: unknown
+    const receive = receiveEmail(input as unknown as ForwardableEmailMessage, e).then(() => { finished = true }, (error) => { finished = true; receiveError = error })
+    try {
+      await backupStarted
+      expect(queue.send).toHaveBeenCalledOnce()
+      expect(finished).toBe(false)
+    } finally {
+      release(); await receive
+      if (previous) await env.DB.prepare("UPDATE settings SET value=? WHERE key='backup_enabled'").bind(previous.value).run()
+      else await env.DB.prepare("DELETE FROM settings WHERE key='backup_enabled'").run()
+    }
+    expect(finished).toBe(true)
+    expect(input.setReject).not.toHaveBeenCalled()
+    if (queueFails) {
+      expect(receiveError).toBeInstanceOf(Error)
+      expect(await env.DB.prepare('SELECT status FROM messages WHERE mailbox_address=?').bind(mailbox).first()).toEqual({ status: 'failed' })
+    } else expect(receiveError).toBeUndefined()
   })
 
   it('preserves snapshots after mail deletion, retries lost acknowledgements with the same event identity, and never drops failed delivery', async () => {
@@ -148,8 +283,8 @@ describe('durable mail push', () => {
       return Response.json({ status: 'accepted' })
     })
     vi.stubGlobal('fetch', fetcher)
-    await runDelivery(); await runDelivery()
-    expect(fetcher).toHaveBeenCalledTimes(2)
+    await runDelivery()
+    expect(fetcher).toHaveBeenCalledOnce()
     expect(await env.DB.prepare('SELECT status FROM mail_push_outbox').first()).toEqual({ status: 'sent' })
   })
 

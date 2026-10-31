@@ -218,13 +218,15 @@ export async function receiveEmail(message: ForwardableEmailMessage, env: Env): 
       return
     }
     inserted = true
-    try {
-      await archiveIncomingMessage(env, id, raw, now)
-    } catch (error) {
+    // Raw storage and the receive transaction are already durable. Dispatch
+    // parsing without waiting for the optional backup copy; still await both
+    // outcomes before finishing this email event, including a queue failure.
+    const queued = Promise.resolve().then(() => env.MAIL_QUEUE.send({ kind: 'parse', messageId: id }))
+    const archived = archiveIncomingMessage(env, id, raw, now).catch((error) => {
       console.error('Unable to archive incoming message', error)
-    }
-
-    await env.MAIL_QUEUE.send({ kind: 'parse', messageId: id })
+    })
+    const [dispatch] = await Promise.allSettled([queued, archived])
+    if (dispatch.status === 'rejected') throw dispatch.reason
   } catch (error) {
     if (inserted) {
       await env.DB.batch([env.DB.prepare(
