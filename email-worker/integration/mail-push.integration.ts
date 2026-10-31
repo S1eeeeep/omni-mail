@@ -2,8 +2,8 @@ import { env } from 'cloudflare:workers'
 import { applyD1Migrations } from 'cloudflare:test'
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import type { Env, SessionUser, MailPushQueueJob } from '../src/app/types'
-import { configureMailPush } from '../src/features/mail-push/push-api'
-import { consumeMailPush } from '../src/features/mail-push/push-delivery'
+import { configureMailPush, mailPushStatus } from '../src/features/mail-push/push-api'
+import { consumeMailPush, enqueueMailPush } from '../src/features/mail-push/push-delivery'
 import { digest, pushSnapshot } from '../src/features/mail-push/push-snapshot'
 import { parseMessage, receiveEmail } from '../src/app/handlers/mail'
 
@@ -43,6 +43,29 @@ describe('durable mail push', () => {
     expect((await configureMailPush(env, user, configuration({ mailboxes: ['another@example.com'] }))).status).toBe(403)
     expect((await configureMailPush(env, user, configuration({ callback_url: 'http://127.0.0.1/api/integrations/omnimail/events' }))).status).toBe(400)
     expect(await env.DB.prepare('SELECT count(*) AS n FROM mail_push_subscriptions').first()).toEqual({ n: 0 })
+  })
+
+  it('exposes actual queue and progress status without credentials or content', async () => {
+    await configureMailPush(env, user, configuration())
+    const response = await mailPushStatus(environment(), user)
+    const raw = await response.text()
+    const status = JSON.parse(raw)
+    expect(status.queue_configured).toBe(true)
+    expect(status.routes).toHaveLength(1)
+    expect(status.routes[0]).toMatchObject({ initialized: 0, pending_events: 0, last_error_code: '' })
+    expect(raw).not.toContain(secret)
+    expect((await (await mailPushStatus(environment(), { ...user, id: 'another' })).json<{ routes: unknown[] }>()).routes).toHaveLength(0)
+  })
+
+  it('queues newly registered routes once and persists enqueue admission', async () => {
+    await configureMailPush(env, user, configuration())
+    const e = environment()
+    await enqueueMailPush(e)
+    await enqueueMailPush(e)
+    expect(e.MAIL_PUSH_QUEUE!.send).toHaveBeenCalledOnce()
+    expect(e.MAIL_PUSH_QUEUE!.send).toHaveBeenCalledWith({ subscriptionId: id, mailbox })
+    const status = await (await mailPushStatus(e, user)).json<{ routes: { enqueued_at: number }[] }>()
+    expect(status.routes[0].enqueued_at).toBeGreaterThan(0)
   })
 
   it('atomically records real receipt and parsed body, then signs metadata and independent body deliveries', async () => {

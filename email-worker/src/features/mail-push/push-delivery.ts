@@ -136,9 +136,13 @@ export async function consumeMailPush(batch: MessageBatch<MailPushQueueJob>, env
         await env.MAIL_PUSH_QUEUE.send(message.body)
         message.ack()
       } else if (delay) message.retry({ delaySeconds: delay }); else message.ack()
-    } catch {
-      await env.DB.prepare('UPDATE mail_push_routes SET last_error_code=\'MAIL_PUSH_DELIVERY_FAILED\' WHERE subscription_id=? AND mailbox_address=?')
-        .bind(message.body.subscriptionId, message.body.mailbox).run()
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : ''
+      const code = detail.includes('D1_ERROR') ? 'MAIL_PUSH_D1_ERROR'
+        : detail.includes('MAIL_PUSH_INVALID_ROUTE_HEADERS') ? 'MAIL_PUSH_INVALID_ROUTE_HEADERS'
+          : detail.includes('credential') ? 'MAIL_PUSH_CREDENTIAL_ERROR' : 'MAIL_PUSH_DELIVERY_FAILED'
+      await env.DB.prepare('UPDATE mail_push_routes SET last_error_code=? WHERE subscription_id=? AND mailbox_address=?')
+        .bind(code, message.body.subscriptionId, message.body.mailbox).run()
       message.retry({ delaySeconds: 30 })
     }
   }

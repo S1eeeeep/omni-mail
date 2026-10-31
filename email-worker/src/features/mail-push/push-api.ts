@@ -63,3 +63,13 @@ export async function retryMailPush(env: Env, user: SessionUser): Promise<Respon
   ])
   return Response.json({ status: 'queued' })
 }
+
+export async function mailPushStatus(env: Env, user: SessionUser): Promise<Response> {
+  const { results } = await env.DB.prepare(`SELECT r.mailbox_address,r.initialized,r.next_sequence,r.enqueued_at,
+    r.lease_until,r.last_sent_at,r.last_error_code,
+    (SELECT count(*) FROM mail_push_outbox e WHERE e.subscription_id=r.subscription_id AND e.mailbox_address=r.mailbox_address AND e.status='pending') AS pending_events,
+    (SELECT count(*) FROM mail_push_outbox e WHERE e.subscription_id=r.subscription_id AND e.mailbox_address=r.mailbox_address AND e.status='failed') AS failed_events
+    FROM mail_push_routes r JOIN mail_push_subscriptions s ON s.id=r.subscription_id
+    WHERE s.user_id=? AND s.enabled=1 AND r.enabled=1 ORDER BY r.mailbox_address`).bind(user.id).all()
+  return Response.json({ queue_configured: Boolean(env.MAIL_PUSH_QUEUE), now: Math.floor(Date.now() / 1000), routes: results })
+}

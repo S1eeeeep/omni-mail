@@ -18,10 +18,11 @@ import { outboundRateLimitRoutes } from '../../features/outbound/outbound-rate-l
 import { clientIp } from '../../shared/http/api-helpers'
 import { mailFeatureRoutes } from './mail-feature-routes'
 import { listMailNotifications } from '../../features/notifications/mail-notification-api'
-import { configureMailPush, retryMailPush } from '../../features/mail-push/push-api'
+import { configureMailPush, retryMailPush, mailPushStatus } from '../../features/mail-push/push-api'
 import { enqueueMailPush } from '../../features/mail-push/push-delivery'
 
 export function registerMailRoutes(app: Hono<AppContext>): void {
+app.get('/api/integrations/mail-push', (c) => mailPushStatus(c.env, c.get('user')))
 app.put('/api/integrations/mail-push', async (c) => {
   const response = await configureMailPush(c.env, c.get('user'), c.req.raw)
   if (response.ok) c.executionCtx.waitUntil(enqueueMailPush(c.env))

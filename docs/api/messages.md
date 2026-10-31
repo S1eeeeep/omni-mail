@@ -8,7 +8,30 @@
 
 > Lists, details, state, attachments, raw source, sending, replies, and translation.
 
-本分类共 **13** 个端点。返回 [完整 API 索引](README.md) 或 [API 架构与安全说明](../API.md)。
+本分类共 **14** 个端点。返回 [完整 API 索引](README.md) 或 [API 架构与安全说明](../API.md)。
+
+<!-- endpoint:GET /api/integrations/mail-push catalog:1eef1778609a -->
+## `GET /api/integrations/mail-push`
+
+**读取推送通道状态 / Read mail push delivery status**
+
+读取当前用户的队列绑定、主邮箱进度、待投递量和错误分类，不返回密钥或邮件内容。
+
+> Return queue availability, mailbox progress, backlog counts and error codes without keys or mail content.
+
+| 项目 | 内容 |
+| --- | --- |
+| 认证 | 登录用户；支持 Session Cookie 或 Access Token |
+| 请求 | No parameters |
+| 成功响应 | 200 · { queue_configured, now, routes } |
+
+### cURL 示例
+
+```bash
+curl --request GET \
+  --url "https://mail.example.com/api/integrations/mail-push" \
+  --header "Authorization: Bearer om_at_..."
+```
 
 <!-- endpoint:POST /api/integrations/mail-push/retry catalog:f6538fa307bd -->
 ## `POST /api/integrations/mail-push/retry`

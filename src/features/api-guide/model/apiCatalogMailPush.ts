@@ -1,6 +1,10 @@
 import { localized as l, type ApiEndpoint } from './apiCatalogTypes'
 
 export const mailPushEndpoints: ApiEndpoint[] = [
+  { method: 'GET', path: '/api/integrations/mail-push', group: 'messages', auth: 'authenticated',
+    title: l('读取推送通道状态', 'Read mail push delivery status'),
+    description: l('读取当前用户的队列绑定、主邮箱进度、待投递量和错误分类，不返回密钥或邮件内容。', 'Return queue availability, mailbox progress, backlog counts and error codes without keys or mail content.'),
+    request: 'No parameters', response: '200 · { queue_configured, now, routes }' },
   { method: 'POST', path: '/api/integrations/mail-push/retry', group: 'messages', auth: 'authenticated',
     title: l('重试失败推送', 'Retry failed mail delivery'),
     description: l('重新排队当前用户的失败推送，保留原事件身份和内容，不重新发送邮件。', 'Requeue failed deliveries for the current user while retaining original event identity and content.'),
