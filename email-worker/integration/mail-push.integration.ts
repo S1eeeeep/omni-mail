@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers'
 import { applyD1Migrations } from 'cloudflare:test'
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import type { Env, SessionUser, MailPushQueueJob } from '../src/app/types'
-import { configureMailPush, mailPushStatus } from '../src/features/mail-push/push-api'
+import { configureMailPush, mailPushStatus, retryMailPush } from '../src/features/mail-push/push-api'
 import { consumeMailPush, enqueueMailPush } from '../src/features/mail-push/push-delivery'
 import { digest, pushSnapshot } from '../src/features/mail-push/push-snapshot'
 import { parseMessage, receiveEmail } from '../src/app/handlers/mail'
@@ -68,6 +68,35 @@ describe('durable mail push', () => {
     expect(status.routes[0].enqueued_at).toBeGreaterThan(0)
   })
 
+  it('constructs delivery requests with actual workerd-supported fetch options', async () => {
+    await configureMailPush(env, user, configuration())
+    await env.DB.prepare('UPDATE mail_push_routes SET initialized=1').run()
+    let requestError = ''
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      try { new Request(url, init) } catch (error) { requestError = String(error); throw error }
+      return Response.json({ status: 'accepted' })
+    }))
+    await runDelivery()
+    expect(requestError).toBe('')
+    expect(await env.DB.prepare('SELECT last_error_code FROM mail_push_routes').first()).toEqual({ last_error_code: '' })
+  })
+
+  it('does not follow redirects with the signed delivery and leaves the event retryable', async () => {
+    await configureMailPush(env, user, configuration())
+    await env.DB.prepare('UPDATE mail_push_routes SET initialized=1').run()
+    await message('redirect-message', true)
+    await (await pushSnapshot(env, 'redirect-message', 'ready', 'Verification code 001234')).run()
+    const fetcher = vi.fn(async (url: string, init: RequestInit) => {
+      const request = new Request(url, init)
+      expect(request.redirect).toBe('manual')
+      return new Response(null, { status: 302, headers: { Location: 'https://another.example.com/' } })
+    })
+    vi.stubGlobal('fetch', fetcher)
+    await runDelivery()
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect(await env.DB.prepare('SELECT status,last_error_code FROM mail_push_outbox').first()).toEqual({ status: 'pending', last_error_code: 'MAIL_PUSH_HTTP_302' })
+  })
+
   it('atomically records real receipt and parsed body, then signs metadata and independent body deliveries', async () => {
     await configureMailPush(env, user, configuration())
     const e = environment()
@@ -112,7 +141,7 @@ describe('durable mail push', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('connection lost') }))
     await runDelivery()
     expect(await env.DB.prepare('SELECT status,attempts FROM mail_push_outbox').first()).toEqual({ status: 'pending', attempts: 1 })
-    await env.DB.prepare('UPDATE mail_push_outbox SET next_attempt_at=0').run()
+    await retryMailPush(env, user)
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body))
       expect(body.events[0].id).toBe(recorded!.event_id)

@@ -57,7 +57,8 @@ export async function configureMailPush(env: Env, user: SessionUser, request: Re
 export async function retryMailPush(env: Env, user: SessionUser): Promise<Response> {
   await env.DB.batch([
     env.DB.prepare(`UPDATE mail_push_outbox SET status='pending',attempts=0,next_attempt_at=0,last_error_code=''
-      WHERE status='failed' AND subscription_id IN(SELECT id FROM mail_push_subscriptions WHERE user_id=? AND enabled=1)`).bind(user.id),
+      WHERE (status='failed' OR (status='pending' AND last_error_code<>''))
+      AND subscription_id IN(SELECT id FROM mail_push_subscriptions WHERE user_id=? AND enabled=1)`).bind(user.id),
     env.DB.prepare(`UPDATE mail_push_routes SET enqueued_at=0 WHERE subscription_id IN(SELECT id FROM mail_push_subscriptions WHERE user_id=? AND enabled=1)`).bind(user.id),
     env.DB.prepare("INSERT INTO audit_logs(user_id,action,ip,detail_json) VALUES(?,'mail_push.retry','','{}')").bind(user.id),
   ])

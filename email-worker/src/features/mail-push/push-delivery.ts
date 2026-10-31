@@ -37,7 +37,7 @@ async function send(env: Env, route: Route, events: Record<string, unknown>[], s
   const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   const bytes = await crypto.subtle.sign('HMAC', key, encoder.encode(`${timestamp}\n${delivery}\n${body}`))
   const signature = Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, '0')).join('')
-  return fetch(route.callback_url, { method: 'POST', body, redirect: 'error', signal: AbortSignal.timeout(20_000), headers: {
+  return fetch(route.callback_url, { method: 'POST', body, redirect: 'manual', signal: AbortSignal.timeout(20_000), headers: {
     'Content-Type': 'application/json', 'X-OmniMail-Subscription': route.subscription_id,
     'X-OmniMail-Timestamp': timestamp, 'X-OmniMail-Delivery': delivery, 'X-OmniMail-Signature': signature,
   } })
