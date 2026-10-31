@@ -30,7 +30,13 @@ async function deliverRoute(env: Env, job: MailPushQueueJob): Promise<number> {
   const acquired = await env.DB.prepare(`UPDATE mail_push_routes SET lease_token=?,lease_until=unixepoch()+110,enqueued_at=0
     WHERE subscription_id=? AND mailbox_address=? AND enabled=1 AND lease_until<unixepoch()`)
     .bind(token, job.subscriptionId, job.mailbox).run()
-  if (!acquired.meta.changes) return 5
+  if (!acquired.meta.changes) {
+    const active = await env.DB.prepare(`SELECT 1 AS active FROM mail_push_routes r
+      JOIN mail_push_subscriptions s ON s.id=r.subscription_id AND s.enabled=1
+      WHERE r.subscription_id=? AND r.mailbox_address=? AND r.enabled=1`)
+      .bind(job.subscriptionId, job.mailbox).first()
+    return active ? 5 : 0
+  }
   try {
     // Backfill is durable and page bounded. Its cursor cannot skip a message
     // inserted during subscription registration; realtime writes share outbox.

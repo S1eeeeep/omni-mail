@@ -104,6 +104,36 @@ describe('durable mail push', () => {
     } finally { await env.DB.prepare('UPDATE mailboxes SET user_id=? WHERE address=?').bind(user.id, mailbox).run() }
   })
 
+  it('acknowledges stale jobs for a retired receiver without fetching or queue writes', async () => {
+    await configureMailPush(env, user, configuration())
+    await message('retired-pending', true)
+    await (await pushSnapshot(env, 'retired-pending', 'ready', 'Verification code 000123')).run()
+    await env.DB.prepare('UPDATE mail_push_routes SET enabled=0 WHERE subscription_id=?').bind(id).run()
+    await env.DB.prepare('UPDATE mail_push_subscriptions SET enabled=0 WHERE id=?').bind(id).run()
+    const e = environment(), fetcher = vi.fn(async () => Response.json({ status: 'accepted' }))
+    vi.stubGlobal('fetch', fetcher)
+    const result = await runDelivery(e)
+    expect(result.ack).toHaveBeenCalledOnce()
+    expect(result.retry).not.toHaveBeenCalled()
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(e.MAIL_PUSH_QUEUE!.send).not.toHaveBeenCalled()
+    expect(await env.DB.prepare("SELECT count(*) AS n FROM mail_push_outbox WHERE status='pending'").first()).toEqual({ n: 1 })
+  })
+
+  it('retires only the migrated icloud callback and retains its evidence', async () => {
+    await configureMailPush(env, user, configuration())
+    await message('retire-evidence', true)
+    await (await pushSnapshot(env, 'retire-evidence', 'ready', 'Verification code 001234')).run()
+    const migration = env.TEST_MIGRATIONS.find((m) => m.name === '0043_retire_icloud_push.sql')!
+    await env.DB.batch(migration.queries.map((sql) => env.DB.prepare(sql)))
+    expect(await env.DB.prepare('SELECT enabled FROM mail_push_subscriptions WHERE id=?').bind(id).first()).toEqual({ enabled: 1 })
+    await env.DB.prepare("UPDATE mail_push_subscriptions SET callback_url='https://icloud.dasaogang.eu.cc/api/integrations/omnimail/events' WHERE id=?").bind(id).run()
+    await env.DB.batch(migration.queries.map((sql) => env.DB.prepare(sql)))
+    expect(await env.DB.prepare('SELECT enabled FROM mail_push_subscriptions WHERE id=?').bind(id).first()).toEqual({ enabled: 0 })
+    expect(await env.DB.prepare('SELECT enabled FROM mail_push_routes WHERE subscription_id=?').bind(id).first()).toEqual({ enabled: 0 })
+    expect(await env.DB.prepare("SELECT count(*) AS n FROM mail_push_outbox WHERE status='pending'").first()).toEqual({ n: 1 })
+  })
+
   it('refreshes progress when a receipt commits between the route and outbox reads', async () => {
     await configureMailPush(env, user, configuration())
     await env.DB.prepare('UPDATE mail_push_routes SET initialized=1').run()
