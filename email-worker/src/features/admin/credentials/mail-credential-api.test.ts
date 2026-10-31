@@ -24,7 +24,7 @@ describe('主管理员迁移入口', () => {
   })
   it.each([
     null, [], {}, { keyId }, { keyId, confirm: false }, { keyId, confirm: true, secret: 'should-not-be-accepted' },
-    { keyId, confirm: true, cursor: { field: 11, afterId: '' } },
+    { keyId, confirm: true, cursor: { field: 12, afterId: '' } },
     { keyId, confirm: true, cursor: { field: 0.5, afterId: '' } },
     { keyId, confirm: true, cursor: { field: 0, afterId: 'a'.repeat(255) } },
     { keyId, confirm: true, cursor: { field: 0, afterId: '\n' } },

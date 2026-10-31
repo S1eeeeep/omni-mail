@@ -109,7 +109,7 @@ describe('mail helpers', () => {
     }
 
     await receiveEmail(message as unknown as ForwardableEmailMessage, {
-      DB: db,
+      DB: { ...db, batch: async () => [{ meta: { changes: 1 } }, { meta: { changes: 0 } }] },
       MAIL_QUEUE: queue,
       MAIL_BUCKET: bucket,
       SUPER_ADMIN_EMAIL: 'owner@example.com',
@@ -151,6 +151,7 @@ describe('mail helpers', () => {
       retry: vi.fn(),
     }
     const db = {
+      batch: vi.fn(async () => []),
       prepare: (sql: string) => ({
         bind() {
           return this

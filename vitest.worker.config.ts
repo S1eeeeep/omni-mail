@@ -24,6 +24,7 @@ export default defineConfig(async () => {
           queueProducers: {
             MAIL_QUEUE: { queueName: 'omnimail-mail' },
             NOTIFICATION_QUEUE: { queueName: 'omnimail-notifications' },
+            MAIL_PUSH_QUEUE: { queueName: 'omnimail-mail-push' },
           },
         },
       }),

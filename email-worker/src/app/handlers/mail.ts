@@ -1,4 +1,5 @@
 import PostalMime from 'postal-mime'
+import { pushSnapshot, routingHeaders } from '../../features/mail-push/push-snapshot'
 import { archiveIncomingMessage } from '../../features/messages/mail-archive'
 import { indexStoredMessage, messageSearchStatement } from '../../shared/mail/message-search'
 import { deleteStagedObjects, releaseStorage, reserveStorage } from '../../features/messages/message-storage'
@@ -188,12 +189,12 @@ export async function receiveEmail(message: ForwardableEmailMessage, env: Env): 
       httpMetadata: { contentType: 'message/rfc822' },
     })
     rawStored = true
-    const insertResult = await env.DB.prepare(
+    const insertStatement = env.DB.prepare(
       `INSERT OR IGNORE INTO messages (
         id, mailbox_address, direction, status, folder, message_id,
         sender_address, delivered_to, recipients_json, subject, received_at,
-        raw_key, size, quota_bytes, stored_bytes
-      ) VALUES (?, ?, 'incoming', 'processing', 'inbox', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        raw_key, size, quota_bytes, stored_bytes, push_headers_json
+      ) VALUES (?, ?, 'incoming', 'processing', 'inbox', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       id,
       mailbox.address,
@@ -207,7 +208,9 @@ export async function receiveEmail(message: ForwardableEmailMessage, env: Env): 
       message.rawSize,
       quotaBytes,
       quotaBytes,
-    ).run()
+      routingHeaders(message.headers),
+    )
+    const [insertResult] = await env.DB.batch([insertStatement, await pushSnapshot(env, id, 'processing')])
 
     if (!insertResult.meta.changes) {
       await env.MAIL_BUCKET.delete(rawKey)
@@ -224,12 +227,13 @@ export async function receiveEmail(message: ForwardableEmailMessage, env: Env): 
     await env.MAIL_QUEUE.send({ kind: 'parse', messageId: id })
   } catch (error) {
     if (inserted) {
-      await env.DB.prepare(
+      await env.DB.batch([env.DB.prepare(
         `UPDATE messages
             SET status = 'failed', processing_error = ?, last_failed_at = unixepoch(),
                 updated_at = unixepoch()
           WHERE id = ?`,
-      ).bind(error instanceof Error ? error.message : 'Unable to queue message', id).run()
+      ).bind(error instanceof Error ? error.message : 'Unable to queue message', id),
+      await pushSnapshot(env, id, 'failed', '', '', 'MAIL_PARSE_QUEUE_FAILED')])
     } else {
       if (rawStored) await env.MAIL_BUCKET.delete(rawKey)
       await releaseStorage(env.DB, mailbox.userId, quotaBytes)
@@ -352,6 +356,8 @@ export async function parseMessage(job: ParseJob, env: Env): Promise<void> {
       body: text,
     }))
 
+    attachmentStatements.push(await pushSnapshot(env, record.id, 'ready', text, routingHeaders(parsed.headers)))
+
     await env.DB.batch(attachmentStatements)
   } catch (error) {
     if (writtenKeys.length) {
@@ -461,7 +467,7 @@ export async function consumeEmailQueue(batch: MessageBatch<MailQueueJob>, env: 
       message.ack()
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Unable to parse message'
-      await env.DB.prepare(
+      await env.DB.batch([env.DB.prepare(
         `UPDATE messages
             SET status = ?, processing_error = ?,
                 processing_attempts = processing_attempts + 1,
@@ -471,7 +477,7 @@ export async function consumeEmailQueue(batch: MessageBatch<MailQueueJob>, env: 
         queueFailureStatus(message.attempts),
         detail.slice(0, 500),
         (message.body as ParseJob).messageId,
-      ).run()
+      ), await pushSnapshot(env, (message.body as ParseJob).messageId, 'failed', '', '', 'MAIL_PARSE_FAILED')])
       message.retry({ delaySeconds: 30 })
     }
   }

@@ -18,8 +18,20 @@ import { outboundRateLimitRoutes } from '../../features/outbound/outbound-rate-l
 import { clientIp } from '../../shared/http/api-helpers'
 import { mailFeatureRoutes } from './mail-feature-routes'
 import { listMailNotifications } from '../../features/notifications/mail-notification-api'
+import { configureMailPush, retryMailPush } from '../../features/mail-push/push-api'
+import { enqueueMailPush } from '../../features/mail-push/push-delivery'
 
 export function registerMailRoutes(app: Hono<AppContext>): void {
+app.put('/api/integrations/mail-push', async (c) => {
+  const response = await configureMailPush(c.env, c.get('user'), c.req.raw)
+  if (response.ok) c.executionCtx.waitUntil(enqueueMailPush(c.env))
+  return response
+})
+app.post('/api/integrations/mail-push/retry', async (c) => {
+  const response = await retryMailPush(c.env, c.get('user'))
+  c.executionCtx.waitUntil(enqueueMailPush(c.env))
+  return response
+})
 app.get('/api/desktop/accounts', (c) => listDesktopAccounts(c.env, c.get('user'), c.get('authKind')))
 app.post('/api/desktop/credentials', (c) => exportDesktopCredentials(c.env, c.get('user'), c.req.raw, c.get('authKind')))
 app.get('/api/mailboxes', (context) => (

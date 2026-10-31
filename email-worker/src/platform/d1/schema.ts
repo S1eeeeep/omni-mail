@@ -117,6 +117,7 @@ async function ensureRequiredMigrations(db: D1Database): Promise<void> {
       throw migrationError(error, migration.name)
     }
   }
+  if (!await appliedMigration(db, REQUIRED_MIGRATION)) throw migrationError()
 }
 
 export function ensureSchema(db: D1Database): Promise<void> {

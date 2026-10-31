@@ -131,7 +131,7 @@ describe('D1 migration check', () => {
   })
 
   it('uses the latest migration as the fast path once per binding', async () => {
-    const fixture = database({ applied: [...FINAL_MIGRATIONS, '0041_domain_mailbox_cleanup.sql'] })
+    const fixture = database({ applied: [...FINAL_MIGRATIONS, '0041_domain_mailbox_cleanup.sql', '0042_mail_push.sql'] })
     await ensureSchema(fixture.db)
     await ensureSchema(fixture.db)
 
@@ -139,13 +139,13 @@ describe('D1 migration check', () => {
     const checkedMigrations = fixture.prepare.mock.results
       .map(({ value }) => (value as MockStatement).bindings[0])
       .filter(Boolean)
-    expect(checkedMigrations).toEqual(['0041_domain_mailbox_cleanup.sql'])
+    expect(checkedMigrations).toEqual(['0042_mail_push.sql'])
   })
 
   it('applies Telegram notifications 0038 to an existing 0037 installation', async () => {
     const fixture = database({ applied: FINAL_MIGRATIONS.slice(0, -3) })
 
-    await ensureSchema(fixture.db)
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
 
     expect(fixture.batch).toHaveBeenCalledTimes(4)
     expect(fixture.applied.has('0038_telegram_notifications.sql')).toBe(true)
@@ -155,7 +155,7 @@ describe('D1 migration check', () => {
 
   it('applies body opt-in 0039 to an existing 0038 installation', async () => {
     const fixture = database({ applied: FINAL_MIGRATIONS.slice(0, -2) })
-    await ensureSchema(fixture.db)
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
     expect(fixture.batch).toHaveBeenCalledTimes(3)
     expect(fixture.applied.has('0039_telegram_message_body.sql')).toBe(true)
     expect(fixture.applied.has('0040_telegram_rich_body.sql')).toBe(true)
@@ -163,7 +163,7 @@ describe('D1 migration check', () => {
 
   it('applies rich body 0040 to an existing 0039 installation', async () => {
     const fixture = database({ applied: FINAL_MIGRATIONS.slice(0, -1) })
-    await ensureSchema(fixture.db)
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
     expect(fixture.batch).toHaveBeenCalledTimes(2)
     expect(fixture.applied.has('0040_telegram_rich_body.sql')).toBe(true)
   })
@@ -171,7 +171,7 @@ describe('D1 migration check', () => {
   it('recovers from 0035 through read optimization and notification versions', async () => {
     const fixture = database({ applied: FINAL_MIGRATIONS.slice(0, -5) })
 
-    await ensureSchema(fixture.db)
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
 
     expect(fixture.batch).toHaveBeenCalledTimes(6)
     expect(fixture.applied.has('0032_netease_mail.sql')).toBe(false)
@@ -188,7 +188,7 @@ describe('D1 migration check', () => {
       applied: [...FINAL_MIGRATIONS.slice(0, -5), '0032_netease_mail.sql'],
     })
 
-    await ensureSchema(fixture.db)
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
 
     expect(fixture.batch).toHaveBeenCalledTimes(6)
     expect(fixture.applied.has('0032_netease_mail.sql')).toBe(true)
@@ -210,7 +210,7 @@ describe('D1 migration check', () => {
     batchCount,
   ) => {
     const fixture = database({ migrationTable: false, legacyVersion })
-    await ensureSchema(fixture.db)
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
 
     expect(fixture.batch).toHaveBeenCalledTimes(batchCount)
     expect(fixture.batches[0]).toHaveLength(baseline + 1)
@@ -265,7 +265,7 @@ describe('D1 migration check', () => {
       legacyVersion: '2026-08-03-p3-multiple-drafts',
     })
 
-    await ensureSchema(fixture.db)
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
 
     expect(fixture.applied.size).toBe(40)
     expect(fixture.batches[0]).toHaveLength(18)
@@ -289,7 +289,7 @@ describe('D1 migration check', () => {
       scopesPresent: true,
     })
 
-    await ensureSchema(fixture.db)
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
 
     expect(fixture.applied.has('0020_device_token_scopes.sql')).toBe(true)
     expect(fixture.applied.has('0021_icloud_accounts.sql')).toBe(true)
@@ -305,7 +305,7 @@ describe('D1 migration check', () => {
       concurrentMigration: '0040_telegram_rich_body.sql',
     })
 
-    await expect(ensureSchema(fixture.db)).resolves.toBeUndefined()
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
     expect(fixture.batch).toHaveBeenCalledTimes(2)
   })
 
@@ -316,7 +316,7 @@ describe('D1 migration check', () => {
     })
 
     await expect(ensureSchema(fixture.db)).rejects.toThrow('0040_telegram_rich_body.sql')
-    await expect(ensureSchema(fixture.db)).resolves.toBeUndefined()
+    await expect(ensureSchema(fixture.db)).rejects.toThrow('0042_mail_push.sql')
     expect(fixture.batch).toHaveBeenCalledTimes(3)
   })
 })

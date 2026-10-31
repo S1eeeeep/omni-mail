@@ -51,6 +51,10 @@
       {
         "binding": "NOTIFICATION_QUEUE",
         "queue": "omnimail-notifications"
+      },
+      {
+        "binding": "MAIL_PUSH_QUEUE",
+        "queue": "omnimail-mail-push"
       }
     ],
     "consumers": [
@@ -67,11 +71,19 @@
         "max_batch_timeout": 2,
         "max_retries": 3,
         "dead_letter_queue": "omnimail-notifications-dead"
+      },
+      {
+        "queue": "omnimail-mail-push",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 20,
+        "max_concurrency": 4,
+        "dead_letter_queue": "omnimail-mail-push-dead"
       }
     ]
   },
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["*/5 * * * *", "* * * * *"]
   },
   "observability": {
     "enabled": true,

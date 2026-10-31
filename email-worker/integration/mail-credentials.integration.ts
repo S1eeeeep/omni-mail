@@ -32,12 +32,13 @@ beforeEach(async () => {
     for (const [index, columns] of rows.entries()) {
       const id = `${table}-${index}`
       const row: Record<string, string | number> = { id, user_id: owner.id, created_at: 1, updated_at: 1 }
-      if (table === 'linux_do_mail_accounts') row.username = 'test@linux.do'
+      if (table === 'mail_push_subscriptions') Object.assign(row, { callback_url: 'https://push.example.com/api/integrations/omnimail/events', secret_hash: 'fixture-hash' })
+      else if (table === 'linux_do_mail_accounts') row.username = 'test@linux.do'
       else row.name = 'Account'
       if (table === 'microsoft_imap_accounts') {
         Object.assign(row, { provided_email: `${index}@outlook.com`, normalized_email: `${index}@outlook.com`,
           auth_mode: index === 0 ? 'oauth2' : 'password', client_id: index === 0 ? 'test-client' : '' })
-      } else if (!['icloud_accounts', 'linux_do_mail_accounts'].includes(table)) row.email = `${table}@example.com`
+      } else if (!['icloud_accounts', 'linux_do_mail_accounts', 'mail_push_subscriptions'].includes(table)) row.email = `${table}@example.com`
       if (table === 'naver_mail_accounts') row.naver_id = 'test'
       if (table === 'yandex_mail_accounts') row.yandex_login = 'test'
       for (const field of columns) {
@@ -50,10 +51,10 @@ beforeEach(async () => {
 })
 
 describe('真实 D1 邮箱密钥迁移', () => {
-  it('读取进度不会写入；分页处理全部 11 个字段，重试幂等且删除旧密钥后可解密', async () => {
+  it('读取进度不会写入；分页处理全部凭据字段，重试幂等且删除旧密钥后可解密', async () => {
     const environment = mixed()
     const before = await mailCredentialMigrationStatus(environment)
-    expect(before).toMatchObject({ total: 11, migrated: 0, pending: 11 })
+    expect(before).toMatchObject({ total: 12, migrated: 0, pending: 12 })
     expect(await mailCredentialMigrationStatus(environment)).toEqual(before)
     const keyId = (await globalMailKeyId(environment))!
     let cursor: MigrationCursor | null = { field: 0, afterId: '' }
@@ -63,7 +64,7 @@ describe('真实 D1 邮箱密钥迁移', () => {
       expect(batch.failed).toBe(0)
       cursor = batch.cursor
     } while (cursor)
-    expect(await mailCredentialMigrationStatus(environment)).toMatchObject({ total: 11, migrated: 11, pending: 0 })
+    expect(await mailCredentialMigrationStatus(environment)).toMatchObject({ total: 12, migrated: 12, pending: 0 })
     expect((await migrateMailCredentialBatch(environment, keyId, { field: 0, afterId: '' })).scanned).toBe(0)
     for (const field of mailCredentialFields) {
       const { results } = await env.DB.prepare(`SELECT id, ${field.column} AS cipher, updated_at FROM ${field.table} WHERE ${field.column} <> ''`)
@@ -88,7 +89,7 @@ describe('真实 D1 邮箱密钥迁移', () => {
       cursor = batch.cursor
     } while (cursor)
     expect(failed).toBe(1)
-    expect(await mailCredentialMigrationStatus(environment)).toMatchObject({ migrated: 10, pending: 1 })
+    expect(await mailCredentialMigrationStatus(environment)).toMatchObject({ migrated: 11, pending: 1 })
     expect(await env.DB.prepare('SELECT app_password_cipher AS cipher FROM gmail_imap_accounts').first())
       .toEqual({ cipher: 'invalid-cipher' })
   })

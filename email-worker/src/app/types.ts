@@ -74,6 +74,8 @@ export interface NotificationQueueJob {
   id: string
 }
 
+export interface MailPushQueueJob { subscriptionId: string; mailbox: string }
+
 export interface BackupWorkflowParams {
   trigger?: 'scheduled' | 'manual' | 'enable'
   requestedBy?: string
@@ -95,6 +97,7 @@ export interface Env {
   MAIL_BUCKET: R2Bucket
   MAIL_QUEUE: Queue<MailQueueJob>
   NOTIFICATION_QUEUE?: Queue<NotificationQueueJob>
+  MAIL_PUSH_QUEUE?: Queue<MailPushQueueJob>
   AI?: Ai
   ASSETS: Fetcher
   BACKUP_BUCKET?: R2Bucket

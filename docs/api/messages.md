@@ -8,7 +8,62 @@
 
 > Lists, details, state, attachments, raw source, sending, replies, and translation.
 
-本分类共 **11** 个端点。返回 [完整 API 索引](README.md) 或 [API 架构与安全说明](../API.md)。
+本分类共 **13** 个端点。返回 [完整 API 索引](README.md) 或 [API 架构与安全说明](../API.md)。
+
+<!-- endpoint:POST /api/integrations/mail-push/retry catalog:f6538fa307bd -->
+## `POST /api/integrations/mail-push/retry`
+
+**重试失败推送 / Retry failed mail delivery**
+
+重新排队当前用户的失败推送，保留原事件身份和内容，不重新发送邮件。
+
+> Requeue failed deliveries for the current user while retaining original event identity and content.
+
+| 项目 | 内容 |
+| --- | --- |
+| 认证 | 登录用户；支持 Session Cookie 或 Access Token |
+| 请求 | No parameters |
+| 成功响应 | 200 · { status: queued } |
+
+### cURL 示例
+
+```bash
+curl --request POST \
+  --url "https://mail.example.com/api/integrations/mail-push/retry" \
+  --header "Authorization: Bearer om_at_..."
+```
+
+<!-- endpoint:PUT /api/integrations/mail-push catalog:954991fd5fa5 -->
+## `PUT /api/integrations/mail-push`
+
+**配置邮件推送 / Configure mail push**
+
+使用完整设备权限，为当前用户明确拥有的主邮箱配置持久推送；签名密钥加密保存。首次订阅补投最近24小时，后续直接推送正文并在失败后重试。
+
+> Requires full device scope and explicitly owned mailboxes. Encrypts the signing key, replays the last 24 hours on initial setup, and retries durable body delivery.
+
+| 项目 | 内容 |
+| --- | --- |
+| 认证 | 登录用户；支持 Session Cookie 或 Access Token |
+| 请求 | JSON · id: UUID, secret: 43-character base64url key, callback_url: HTTPS receiver URL, mailboxes: string[] |
+| 成功响应 | 200 · { status, subscription_id, mailboxes } |
+
+### cURL 示例
+
+```bash
+curl --request PUT \
+  --url "https://mail.example.com/api/integrations/mail-push" \
+  --header "Authorization: Bearer om_at_..." \
+  --header "Content-Type: application/json" \
+  --data '{
+  "id": "12556f6a-15f0-4d91-af71-67ec23d7ce47",
+  "secret": "REPLACE_WITH_A_32_BYTE_BASE64URL_SIGNING_KEY",
+  "callback_url": "https://pickup.example.com/api/integrations/omnimail/events",
+  "mailboxes": [
+    "owner@example.com"
+  ]
+}'
+```
 
 <!-- endpoint:GET /api/mail-notifications catalog:99e8ea3dcf96 -->
 ## `GET /api/mail-notifications`

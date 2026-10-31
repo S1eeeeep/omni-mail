@@ -131,6 +131,7 @@ Serverless Webmail：
 - Cloudflare Email Routing + Catch-all 收件
 - 可选无人收件：未创建地址的邮件统一进入主管理员收件箱
 - Cloudflare Queue 异步解析，避免阻塞收件事件
+- 支持向自有取码服务可靠推送邮件，见[主动推送接入](docs/integrations/icloud-mail-push.md)
 - 收件箱、星标、已发送和垃圾箱
 - 标准邮件头驱动的会话线程视图与最多 50 封批量操作
 - HTML / 纯文本正文查看

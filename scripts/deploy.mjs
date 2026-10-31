@@ -2,6 +2,7 @@ import { parseArgs } from 'node:util'
 import { applyD1Migrations } from './apply-d1-migrations.mjs'
 import { isMainModule, reportFailure, runWrangler, withRetry } from './wrangler-command.mjs'
 import { cloudflareReader, resolveDeploymentTarget, targetArguments, writeDeploymentTarget } from './deployment-target.mjs'
+import { provisionMailPushQueues } from './provision-mail-push.mjs'
 
 export function deploymentOptions(args) {
   // 只接收能同时安全传给迁移与部署的目标参数，避免 --name 等覆盖项导致两个操作指向不同资源。
@@ -55,10 +56,12 @@ export async function deploy(args = [], {
   const write = () => { const file = writeTarget(target); files.push(file); return file.path }
   const publish = (path) => retry(() => run(['deploy', ...targetArguments(values, path, true)]), { label: 'Worker 部署' })
   try {
+    const initialPath = write()
+    await provisionMailPushQueues(target, values, initialPath, { get, run, retry })
     // 目标解析已核对建库条件；Cloudflare 预先创建的空 Worker 也需要先配置资源再迁移。
     if (!target.databaseId) {
       console.log(`首次部署：为 ${target.workerName} 创建资源绑定。`)
-      await publish(write())
+      await publish(initialPath)
       try {
         // 首次创建后重新读取绑定 ID，不能再次按 Worker 名称猜数据库名。
         target = await retry(async () => {
@@ -73,7 +76,7 @@ export async function deploy(args = [], {
       console.log('首次部署完成，D1 迁移校验通过。')
       return
     }
-    const path = write()
+    const path = initialPath
     console.log(`已定位 ${target.workerName} 的 DB 绑定，正在检查并迁移 D1……`)
     await migrate({ configArgs: targetArguments(values, path) })
     await publish(path)

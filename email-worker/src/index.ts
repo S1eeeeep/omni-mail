@@ -1,7 +1,8 @@
 import { fetchApi } from './app/api'
 import { cleanup } from './platform/scheduling/cleanup'
 import { consumeEmailQueue, receiveEmail } from './app/handlers/mail'
-import type { Env, MailQueueJob, NotificationQueueJob } from './app/types'
+import type { Env, MailQueueJob, NotificationQueueJob, MailPushQueueJob } from './app/types'
+import { consumeMailPush, enqueueMailPush } from './features/mail-push/push-delivery'
 import { D1QuotaError, d1QuotaResponse, quotaEnvironment, quotaQueueDelay } from './platform/d1/quota-guard'
 import { ensureSchema } from './platform/d1/schema'
 import { consumeNotificationQueue, enqueuePendingNotifications, purgeOldNotifications } from './features/telegram/telegram-delivery'
@@ -24,16 +25,26 @@ async function fetchRequest(request: Request, env: Env, context: ExecutionContex
 
 export default {
   fetch: fetchRequest,
-  email: (message, env) => receiveEmail(message, quotaEnvironment(env)),
+  email: async (message, env, context) => {
+    const guarded = quotaEnvironment(env)
+    await receiveEmail(message, guarded)
+    context.waitUntil(enqueueMailPush(guarded))
+  },
   queue: async (batch, env) => {
     const guarded = quotaEnvironment(env)
     try {
+      if (batch.queue === 'omnimail-mail-push') {
+        await ensureSchema(guarded.DB)
+        await consumeMailPush(batch as MessageBatch<MailPushQueueJob>, guarded)
+        return
+      }
       if (batch.queue === 'omnimail-notifications') {
         await ensureSchema(guarded.DB)
         await consumeNotificationQueue(batch as MessageBatch<NotificationQueueJob>, guarded)
         return
       }
       await consumeEmailQueue(batch as MessageBatch<MailQueueJob>, guarded)
+      await enqueueMailPush(guarded)
       await enqueuePendingNotifications(guarded).catch(() => undefined)
     }
     catch (error) {
@@ -42,13 +53,16 @@ export default {
       batch.retryAll({ delaySeconds: quotaQueueDelay(error) })
     }
   },
-  scheduled: async (_controller, env) => {
+  scheduled: async (controller, env) => {
     const guarded = quotaEnvironment(env)
     try {
+      await ensureSchema(guarded.DB)
+      await enqueueMailPush(guarded)
+      if (controller.cron === '* * * * *') return
       await cleanup(guarded)
       await enqueuePendingNotifications(guarded)
       await purgeOldNotifications(guarded.DB)
     }
     catch (error) { if (!(error instanceof D1QuotaError)) throw error }
   },
-} satisfies ExportedHandler<Env, MailQueueJob | NotificationQueueJob>
+} satisfies ExportedHandler<Env, MailQueueJob | NotificationQueueJob | MailPushQueueJob>

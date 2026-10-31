@@ -42,7 +42,7 @@ beforeAll(async () => {
 })
 
 describe('Worker storage bindings', () => {
-  it('recovers a legacy database through iCloud and preserves Wrangler history', async () => {
+  it('recovers historical schema but requires the deployment SQL for mail push, preserving Wrangler history', async () => {
     const beforeScopes = await env.DB.prepare(
       "SELECT 1 AS present FROM pragma_table_info('device_sessions') WHERE name = 'scopes' LIMIT 1",
     ).first<{ present: number }>()
@@ -57,7 +57,7 @@ describe('Worker storage bindings', () => {
       env,
       createExecutionContext(),
     )
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(500)
 
     const columns = await env.DB.prepare(
       "SELECT name, dflt_value FROM pragma_table_info('device_sessions') WHERE name = 'scopes'",
@@ -83,6 +83,8 @@ describe('Worker storage bindings', () => {
     expect(accountTable?.name).toBe('icloud_accounts')
 
     await applyD1Migrations(env.DB, env.TEST_MIGRATIONS)
+    const initialized = await worker.fetch(new Request('https://mail.example.com/api/config'), env, createExecutionContext())
+    expect(initialized.status).toBe(200)
     const migrations = await env.DB.prepare(
       `SELECT name, COUNT(*) AS total FROM d1_migrations
        WHERE name IN (
